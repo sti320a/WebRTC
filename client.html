@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>WebRTC TestClient</title>
+</head>
+
+<body>
+    <form name="form">
+        <textarea name="message" cols="50"></textarea><br>
+        <textarea name="result" cols="50"></textarea>
+        <input type="button" name="sendButton" value="送信" onClick="sendText()">
+    </form>
+
+    <script type="text/javascript">
+        function connect() {
+            websocket = new WebSocket('ws://localhost:8765/');
+            websocket.onopen = function (event) {
+                console.log('Opened');
+            };
+            websocket.onclose = function (event) {
+                console.log('Closed');
+            };
+            websocket.onmessage = function (event) {
+                console.log('Received a message');
+                document.form.result.value = event.data;
+            };
+            websocket.onerror = function (event) {
+                console.error(event);
+            };
+        }
+        function sendText() {
+            websocket.send(document.form.message.value);
+        }
+        window.addEventListener('load', connect, false);
+    </script>
+</body>
+
+</html>
