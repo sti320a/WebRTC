@@ -10,26 +10,248 @@
 
 <body>
     <form name="form">
-        <textarea name="message" cols="50"></textarea><br>
-        <textarea name="result" cols="50"></textarea><br>
-        <input type="button" name="sendButton" value="送信" onClick="sendText()">
+        <p>SDP to send:<br>
+            <textarea id="text_for_send_sdp" rows="5" cols="60" readonly="readonly">SDP to send</textarea>
+        </p>
+        <p>SDP to receive:<br>
+            <button type="button" onclick="onSdpText();">Receive remote SDP</button><br>
+            <textarea id="text_for_receive_sdp" rows="5" cols="60"></textarea>
+        </p>
+
+        <p>
+            <input type="button" name="connectButton" value="接続" onClick="connect()">
+            <button type="button" onclick="startVideo();">カメラを起動</button>
+        </p>
+
+        <p>
+            <video id="local_video" autoplay style="width: 160px; height: 120px; border: 1px solid black;"></video>
+            <video id="remote_video" autoplay style="width: 160px; height: 120px; border: 1px solid black;"></video>
+        </p>
     </form>
 
     <script type="text/javascript">
-        function connect() {
-            websocket = new WebSocket('ws://localhost:8765/');
-            websocket.onopen = (event) => { console.log('Opened'); };
-            websocket.onclose = (event) => { console.log('Closed'); };
-            websocket.onerror = (event) => { console.error(event); };
-            websocket.onmessage = (event) => {
-                console.log('Received a message');
-                document.form.result.value = event.data;
+        const localVideo = document.getElementById('local_video');
+        const remoteVideo = document.getElementById('remote_video');
+        const textForSendSdp = document.getElementById('text_for_send_sdp');
+        const textToReceiveSdp = document.getElementById('text_for_receive_sdp');
+        let localStream = null;
+        let peerConnection = null;
+
+        websocket = new WebSocket('ws://localhost:8765/');
+        websocket.onopen = (event) => { console.log('Opened'); };
+        websocket.onclose = (event) => { console.log('Closed'); };
+        websocket.onerror = (event) => { console.error(event); };
+        websocket.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            if (message.type === 'offer') {
+                console.log('Received offer ...');
+                textToReceiveSdp.value = message.sdp;
+                const offer = new RTCSessionDescription(message);
+                setOffer(offer);
+            } else if (message.type === 'answer') {
+                console.log('Received answer ...');
+                textToReceiveSdp.value = message.sdp;
+                const answer = new RTCSessionDescription(message);
+                setAnswer(answer);
+            } else if (message.type === 'candidate') {
+                console.log('Received ICE candidate ...');
+                const candidate = new RTCIceCandidate(message.ice);
+                console.log(candidate);
+                addIceCandidate(candidate);
+            } else if (message.type === 'close') {
+                hangUp();
+            }
+        };
+
+        function addIceCandidate(candidate) {
+            if (peerConnection) {
+                peerConnection.addIceCandidate(candidate);
+            }
+            else {
+                console.error('接続がありません。');
+                return;
+            }
+        }
+
+        // ICECandidateを送信する
+        function sendIceCandidate(candidate) {
+            const message = JSON.stringify({ type: 'candidate', ice: candidate });
+            websocket.send(message);
+        }
+
+        function startVideo() {
+            navigator.mediaDevices.getUserMedia(
+                { video: true, audio: true }
+            ).then((stream) => {
+                playVideo(localVideo, stream);
+                localStream = stream;
+            }).catch((error) => {
+                console.error(error);
+                return;
+            });
+        }
+
+        function playVideo(element, stream) {
+            element.srcObject = stream;
+            element.play();
+        }
+
+        function prepareNewConnection() {
+
+            const peer = new RTCPeerConnection({ 'iceServers': [] });
+
+            if ('ontrack' in peer) {
+                peer.ontrack = (event) => { playVideo(remoteVideo, event.streams[0]); };
+            } else {
+                peer.onaddstream = (event) => { playVideo(remoteVideo, event.stream); };
+            }
+
+            // IceCandidateを収集したとき
+            peer.onicecandidate = (event) => {
+                // TrickleICEの場合で実装
+                if (event.candidate) {
+                    console.log(event.candidate);
+                    // TrickleICEなのでこの段階でICECandidateを送信する
+                    sendIceCandidate(event.candidate);
+                } else {
+                    console.log('ICE候補がありません');
+                }
             };
+
+            // ICEの接続状態が変更になったとき
+            peer.oniceconnectionstatechange = () => {
+                console.log('ICEの接続状態状態が変更されました' + peer.iceConnectionState);
+                switch (peer.iceConnectionState) {
+                    case 'closed':
+                    case 'failed':
+                        if (peerConnection) {
+                            hangUp();
+                        }
+                        break;
+                    case 'dissconnected':
+                        break;
+                }
+            }
+
+            // ローカルのストリームを準備
+            if (localStream) {
+                peer.addStream(localStream);
+            } else {
+                console.warn('ローカルストリームが見つかりません');
+            }
+            return peer;
         }
-        function sendText() {
-            websocket.send(document.form.message.value);
+
+        function sendSdp(sessionDescription) {
+            textForSendSdp.value = sessionDescription.sdp;
+            const message = JSON.stringify(sessionDescription);
+            websocket.send(message);
         }
-        window.addEventListener('load', connect, false);
+
+        function connect() {
+            if (!peerConnection) {
+                console.log('make Offer');
+                makeOffer();
+            }
+            else {
+                console.warn('peer already exist.');
+            }
+        }
+
+        function makeOffer() {
+            peerConnection = prepareNewConnection();
+            peerConnection.onnegotiationneeded = () => {
+                peerConnection.createOffer()
+                    .then(function (sessionDescription) {
+                        return peerConnection.setLocalDescription(sessionDescription);
+                    }).then(function () {
+                        sendSdp(peerConnection.localDescription);
+                    }).catch(function (error) {
+                        console.error(error);
+                    });
+            }
+        }
+
+        function makeAnswer() {
+            if (peerConnection == undefined) {
+                return;
+            }
+            peerConnection.createAnswer()
+                .then(function (sessionDescription) {
+                    return peerConnection.setLocalDescription(sessionDescription);
+                }).then(function () {
+                    sendSdp(peerConnection.localDescription);
+                }).catch(function (error) {
+                    console.error(error);
+                });
+        }
+
+        function onSdpText() {
+            const text = textToReceiveSdp.value;
+            if (peerConnection) {
+                const answer = new RTCSessionDescription({
+                    type: 'answer',
+                    sdp: text,
+                });
+                setAnswer(answer);
+            }
+            else {
+                const offer = new RTCSessionDescription({
+                    type: 'offer',
+                    sdp: text,
+                });
+                setOffer(offer);
+            }
+            textToReceiveSdp.value = '';
+        }
+
+        function setOffer(sessionDescription) {
+            if (peerConnection) {
+                console.error('既に接続されています');
+            }
+            peerConnection = prepareNewConnection();
+            peerConnection.onnegotiationneeded = function () {
+                peerConnection.setRemoteDescription(sessionDescription)
+                    .then(function () {
+                        makeAnswer();
+                    }).catch(function (error) {
+                        console.error(error);
+                    });
+            }
+        }
+
+        function setAnswer(sessionDescription) {
+            if (!peerConnection) {
+                console.error('接続されていません');
+                return;
+            }
+            peerConnection.setRemoteDescription(sessionDescription)
+                .then(function () {
+                }).catch(function (error) {
+                    console.error(error);
+                });
+        }
+
+        function hangUp() {
+            if (peerConnection) {
+                if (peerConnection.iceConnectionState !== 'closed') {
+                    peerConnection.close();
+                    peerConnection = null;
+                    const message = JSON.stringify({ type: 'close' });
+                    ws.send(message);
+                    cleanupVideoElement(remoteVideo);
+                    textForSendSdp.value = '';
+                    textToReceiveSdp.value = '';
+                    return;
+                }
+            }
+            console.log('Closed');
+        }
+
+        function cleanupVideoElement(element) {
+            element.pause();
+            element.srcObject = null;
+        }
     </script>
 </body>
 
