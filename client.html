@@ -18,18 +18,12 @@
     <script type="text/javascript">
         function connect() {
             websocket = new WebSocket('ws://localhost:8765/');
-            websocket.onopen = function (event) {
-                console.log('Opened');
-            };
-            websocket.onclose = function (event) {
-                console.log('Closed');
-            };
-            websocket.onmessage = function (event) {
+            websocket.onopen = (event) => { console.log('Opened'); };
+            websocket.onclose = (event) => { console.log('Closed'); };
+            websocket.onerror = (event) => { console.error(event); };
+            websocket.onmessage = (event) => {
                 console.log('Received a message');
                 document.form.result.value = event.data;
-            };
-            websocket.onerror = function (event) {
-                console.error(event);
             };
         }
         function sendText() {
