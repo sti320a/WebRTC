@@ -1,8 +1,11 @@
 import asyncio
 import websockets
 
+clients = []
+
 
 async def echo(websocket, path):
+    # TODO: client情報によって処理を分ける
     async for message in websocket:
         await websocket.send(message)
         print(message)
