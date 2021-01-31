@@ -9,7 +9,8 @@
 </head>
 
 <body>
-    <form name="form">
+
+    <div>
         <p>SDP to send:<br>
             <textarea id="text_for_send_sdp" rows="5" cols="60" readonly="readonly">SDP to send</textarea>
         </p>
@@ -17,17 +18,18 @@
             <button type="button" onclick="onSdpText();">Receive remote SDP</button><br>
             <textarea id="text_for_receive_sdp" rows="5" cols="60"></textarea>
         </p>
-
         <p>
-            <input type="button" name="connectButton" value="接続" onClick="connect()">
+            <input type="button" name="connectButton" value="接続" onclick="connect();">
             <button type="button" onclick="startVideo();">カメラを起動</button>
         </p>
-
+        <p>
+            <button type="button" onclick="hangUp();">通話を終了</button>
+        </p>
         <p>
             <video id="local_video" autoplay style="width: 160px; height: 120px; border: 1px solid black;"></video>
             <video id="remote_video" autoplay style="width: 160px; height: 120px; border: 1px solid black;"></video>
         </p>
-    </form>
+    </div>
 
     <script type="text/javascript">
         const localVideo = document.getElementById('local_video');
@@ -76,12 +78,13 @@
         // ICECandidateを送信する
         function sendIceCandidate(candidate) {
             const message = JSON.stringify({ type: 'candidate', ice: candidate });
+            console.log('Sending candidate=' + message);
             websocket.send(message);
         }
 
         function startVideo() {
             navigator.mediaDevices.getUserMedia(
-                { video: true, audio: true }
+                { video: true, audio: false }
             ).then((stream) => {
                 playVideo(localVideo, stream);
                 localStream = stream;
@@ -101,9 +104,19 @@
             const peer = new RTCPeerConnection({ 'iceServers': [] });
 
             if ('ontrack' in peer) {
-                peer.ontrack = (event) => { playVideo(remoteVideo, event.streams[0]); };
+                peer.ontrack = (event) => {
+                    playVideo(
+                        remoteVideo,
+                        event.streams[0]
+                    );
+                };
             } else {
-                peer.onaddstream = (event) => { playVideo(remoteVideo, event.stream); };
+                peer.onaddstream = (event) => {
+                    playVideo(
+                        remoteVideo,
+                        event.stream
+                    );
+                };
             }
 
             // IceCandidateを収集したとき
@@ -150,7 +163,6 @@
 
         function connect() {
             if (!peerConnection) {
-                console.log('make Offer');
                 makeOffer();
             }
             else {
@@ -173,7 +185,7 @@
         }
 
         function makeAnswer() {
-            if (peerConnection == undefined) {
+            if (!peerConnection) {
                 return;
             }
             peerConnection.createAnswer()
@@ -227,6 +239,7 @@
             }
             peerConnection.setRemoteDescription(sessionDescription)
                 .then(function () {
+                    console.log('setRemoteDescription(answer) succsess in promise');
                 }).catch(function (error) {
                     console.error(error);
                 });
