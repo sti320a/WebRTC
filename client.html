@@ -125,9 +125,10 @@
                 if (event.candidate) {
                     console.log(event.candidate);
                     // TrickleICEなのでこの段階でICECandidateを送信する
-                    sendIceCandidate(event.candidate);
+                    // sendIceCandidate(event.candidate);
                 } else {
                     console.log('ICE候補がありません');
+                    sendSdp(peer.localDescription);
                 }
             };
 
@@ -177,7 +178,7 @@
                     .then(function (sessionDescription) {
                         return peerConnection.setLocalDescription(sessionDescription);
                     }).then(function () {
-                        sendSdp(peerConnection.localDescription);
+                        // sendSdp(peerConnection.localDescription);
                     }).catch(function (error) {
                         console.error(error);
                     });
