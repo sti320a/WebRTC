@@ -1,0 +1,33 @@
+.videos-container {
+    display: flex;
+    flex-direction: row;
+    margin-bottom: 32px;
+    width: 100%;
+}
+
+.video-wrapper {
+    width: 100%;
+}
+
+.video-wrapper video {
+    display: block;
+    width: 100%;
+}
+
+.sdps-container {
+    display: none;
+}
+
+.operation-button {
+    appearance: none;
+    border: none;
+    border-radius: 8px;
+    background-color: gray;
+    color: white;
+    font-size: 14px;
+    letter-spacing: 1px;
+    line-height: 48px;
+    margin: 0 0 16px 0;
+    height: 48px;
+    width: 200px;
+}

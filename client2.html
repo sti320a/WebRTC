@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>WebRTC Client 2.0</title>
+    <link rel="stylesheet" href="client2.css">
+</head>
+
+<body>
+    <div class="videos-container">
+        <div class="video-wrapper">
+            <div>自分側</div>
+            <video id='local-video' autoplay></video>
+        </div>
+
+        <div class="video-wrapper">
+            <div>相手側</div>
+            <video id='remote-video' autoplay></video>
+        </div>
+    </div>
+
+    <div class="sdps-container">
+        <textarea id='text-for-send-sdp'></textarea>
+        <textarea id='text-for-receive-sdp'></textarea>
+    </div>
+
+    <button class="operation-button" onclick="connect();">接続する</button>
+    <button class="operation-button" onclick="startVideo();">カメラを起動する</button>
+    <button class="operation-button" onclick="shareDisplay();">ディスプレイを共有する</button>
+    <button class="operation-button" onclick="hangUp();">通話を終了する</button>
+    <script src="./webrtc.js"></script>
+</body>
+
+</html>

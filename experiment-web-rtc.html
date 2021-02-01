@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Experiment WebRTC</title>
+</head>
+
+<body>
+    <div id="output"></div>
+    <button onclick="displayDevices()">接続済みのデバイスを表示</button>
+
+    <video id="local-video" autoplay></video>
+    <button onclick="openCamera();">カメラを起動する</button>
+
+    <video id="local-display" autoplay></video>
+    <button onclick="captureDisplay();">画面をキャプチャする</button>
+
+    <button onclick="makeCall();">呼び出す</button>
+
+    <script type="text/javascript">
+        function displayDevices() {
+            const out = document.querySelector('#output');
+            navigator.mediaDevices.enumerateDevices().then(
+                devices => {
+                    out.textContent = JSON.stringify(devices);
+                }
+            );
+        }
+        function openCamera() {
+            const constraint = {
+                video: {
+                    width: 640,
+                    height: 480
+                }
+            }
+            navigator.mediaDevices.getUserMedia(constraint).then(
+                (stream) => {
+                    console.log(stream.getTracks());
+                    const localVideo = document.querySelector('#local-video');
+                    localVideo.srcObject = stream;
+                },
+                (error) => {
+                    console.error(error);
+                }
+            )
+        }
+        function captureDisplay() {
+            const constraint = {
+                video: {
+                    cursor: 'motion',
+                    displaySurface: 'window'
+                }
+            }
+            navigator.mediaDevices.getDisplayMedia(constraint).then(
+                (stream) => {
+                    console.log(stream.getTracks());
+                    const localDisplay = document.querySelector('#local-display');
+                    localDisplay.srcObject = stream;
+                }
+            )
+        }
+
+        // 仮のもの
+        const signalingChannel = new SignalingChannel(remoteClientId);
+        signalingChannel.addEventListener('message', message => {
+            // New message from remote client received
+        });
+        signalingChannel.send('Hello!');
+
+        // 送信側
+        function makeCall() {
+            // Connectionを準備
+            const configuration = { 'iceServers': [{ 'urls': 'stun:stun.l.google.com:19302' }] };
+            const peerConnection = new RTCPeerConnection(configuration);
+
+            // 受信側からメッセージを受信した時の対応
+            signalingChannel.addEventListener('message', async message => {
+                if (message.answer) {
+                    const remoteDesc = new RTCSessionDescription(message.answer);
+                    await peerConnection.setRemoteDescription(remoteDesc);
+                }
+            });
+
+            // SDPOfferを作成して送信する
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            signalingChannel.send({ 'offer': offer });
+
+        }
+
+    </script>
+</body>
+
+</html>
